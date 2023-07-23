@@ -4,6 +4,9 @@
 #include "main.h"
 #include "i2c.h"
 
+#define BME280_SCL_GPIO_PORT	GPIOA
+#define BME280_SDA_GPIO_PORT	GPIOC
+
 // Oversampling definitions
 #define OSRS_OFF    	0x00
 #define OSRS_1      	0x01
