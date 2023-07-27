@@ -9,7 +9,7 @@ void spi_init(SPI_TypeDef *spi)
 	while (READ_BIT(spi->SR, SPI_SR_BSY));
 	CLEAR_BIT(spi->CR1, SPI_CR1_SPE);
 
-	MODIFY_REG(spi->CR1, SPI_CR1_BR, 0b100 << SPI_CR1_BR_Pos);
+	MODIFY_REG(spi->CR1, SPI_CR1_BR, 0b101 << SPI_CR1_BR_Pos);
 	/* SPI MODE */
 	CLEAR_BIT(spi->CR1, SPI_CR1_CPOL);
 	CLEAR_BIT(spi->CR1, SPI_CR1_CPHA);
@@ -47,13 +47,6 @@ void spi_init(SPI_TypeDef *spi)
 	CLEAR_BIT(GPIOB->OTYPER, GPIO_OTYPER_OT15);
 	MODIFY_REG(GPIOB->OSPEEDR, GPIO_OSPEEDR_OSPEED15, 0b10 << GPIO_OSPEEDR_OSPEED15_Pos);
 	MODIFY_REG(GPIOB->AFR[1], GPIO_AFRH_AFSEL15, 0b0101 << GPIO_AFRH_AFSEL15_Pos);
-	/* CS */
-	MODIFY_REG(GPIOB->MODER, GPIO_MODER_MODER12, 0b01 << GPIO_MODER_MODER12_Pos);
-	CLEAR_BIT(GPIOB->OTYPER, GPIO_OTYPER_OT12);
-	MODIFY_REG(GPIOB->OSPEEDR, GPIO_OSPEEDR_OSPEED15, 0b10 << GPIO_OSPEEDR_OSPEED12_Pos);
-	MODIFY_REG(GPIOB->PUPDR, GPIO_PUPDR_PUPD12, 0b01 << GPIO_PUPDR_PUPD12_Pos);
-	SET_BIT(GPIOB->ODR, GPIO_ODR_OD12);
-
 
 	SET_BIT(spi->CR1, SPI_CR1_SPE);
 
@@ -68,14 +61,24 @@ bool spi_transmit(SPI_TypeDef *spi, uint8_t *txbuf, uint16_t txlen, uint32_t tim
 
 	for (uint8_t i = 0; i < txlen; i++)
 	{
-		while (!READ_BIT(spi->SR, SPI_SR_TXE))
+		while (!(READ_BIT(spi->SR, SPI_SR_TXE)))
 		{
 			if (get_tick() - current_tick > timeout)
 			{
 				return false;
 			}
 		}
-		WRITE_REG(spi->DR, txbuf[i]);
+		spi->DR = txbuf[i];
+		while (!(READ_BIT(spi->SR, SPI_SR_RXNE)))
+		{
+			if (get_tick() - current_tick > timeout)
+			{
+				return false;
+			}
+		}
+		/* Reset RXNE flag */
+		uint8_t temp = spi->DR;
+
 	}
 
 	return true;
@@ -87,7 +90,8 @@ bool spi_receive(SPI_TypeDef *spi, uint8_t *rxbuf, uint16_t rxlen, uint32_t time
 
 	for (uint8_t i = 0; i < rxlen; i++)
 	{
-		while (!READ_BIT(spi->SR, SPI_SR_RXNE))
+		spi->DR = 0;
+		while (!(READ_BIT(spi->SR, SPI_SR_RXNE)))
 		{
 			if (get_tick() - current_tick > timeout)
 			{

@@ -12,12 +12,12 @@ w5500chip_t w5500;
 
 static void w5500_select(void)
 {
-	CLEAR_BIT(GPIOB->ODR, GPIO_ODR_OD12);
+	CLEAR_BIT(W5500_CS_GPIO_PORT->ODR, GPIO_ODR_OD12);
 }
 
 static void w5500_unselect(void)
 {
-	SET_BIT(GPIOB->ODR, GPIO_ODR_OD12);
+	SET_BIT(W5500_CS_GPIO_PORT->ODR, GPIO_ODR_OD12);
 }
 
 static uint8_t w5500_read_byte(void)
@@ -46,6 +46,13 @@ static void w5500_hw_reset()
 
 bool w5500_init(SPI_TypeDef *spi)
 {
+	/* CS */
+	MODIFY_REG(W5500_CS_GPIO_PORT->MODER, GPIO_MODER_MODER12, 0b01 << GPIO_MODER_MODER12_Pos);
+	CLEAR_BIT(W5500_CS_GPIO_PORT->OTYPER, GPIO_OTYPER_OT12);
+	MODIFY_REG(W5500_CS_GPIO_PORT->OSPEEDR, GPIO_OSPEEDR_OSPEED12, 0b11 << GPIO_OSPEEDR_OSPEED12_Pos);
+	MODIFY_REG(W5500_CS_GPIO_PORT->PUPDR, GPIO_PUPDR_PUPD12, 0b01 << GPIO_PUPDR_PUPD12_Pos);
+	SET_BIT(W5500_CS_GPIO_PORT->ODR, GPIO_ODR_OD12);
+
 	bool status = true;
 
 	w5500.spi_port = spi;
@@ -76,11 +83,6 @@ bool w5500_init(SPI_TypeDef *spi)
 	/*setting gateway*/
 	uint8_t gw[4] = {192, 168, 0, 2};
 	memcpy(w5500.netinfo.gw, gw, 4);
-
-	wiz_NetTimeout gWIZNETTIME = {.retry_cnt = 0,
-	                              .time_100us = 500};
-
-	wizchip_settimeout(&gWIZNETTIME);
 
 	wizchip_init(w5500.rxtx_buff, w5500.rxtx_buff);
 

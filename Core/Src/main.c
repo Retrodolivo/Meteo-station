@@ -24,8 +24,8 @@ int main(void)
 {
 	system_init();
 	lcd_init(USART2);
-	w5500_init(SPI2);
 	led_init();
+	w5500_init(SPI2);
 
 	bme280.i2c_port = I2C3;
 	bme280.i2c_addr = 0x76;
@@ -37,9 +37,7 @@ int main(void)
 		float temp = bme280.temperature;
 		float press = bme280.pressure;
 		float humid = bme280.humidity;
-
 		lcd_write(buf, strlen((char *)buf));
-		spi_transmit(SPI2, "hello", strlen("hello"), 1000);
 		GPIOD->ODR ^= GPIO_ODR_OD13;
 
 		delay_ms(1000);
