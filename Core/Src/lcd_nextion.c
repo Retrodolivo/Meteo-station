@@ -2,23 +2,70 @@
 #include "lcd_nextion.h"
 #include "dma.h"
 
-USART_TypeDef *lcd_uart;
-uint8_t terminator[3] = {0xFF, 0xFF, 0xFF};
+#ifdef RTOS
 
-void lcd_init(USART_TypeDef *uart)
+	#include "FreeRTOS.h"
+	#include "task.h"
+#elif
+	#include "delay.h"
+
+#endif
+
+
+static LCD_st lcd;
+
+static bool lcd_write_cmplt_flag = true;
+
+static void lcd_buf_flush(void);
+
+void lcd_init(USART_TypeDef *uart, uint8_t *txbuf)
 {
-	lcd_uart = uart;
+	lcd.uart = uart;
+	lcd.txbuf = txbuf;
+	memset(lcd.msg_terminator, TERM_SYMB, NUM_ELEMS(lcd.msg_terminator));
 }
 
-bool lcd_write(uint8_t *buf, uint16_t len)
+
+bool lcd_write(uint8_t *string, uint16_t len, uint32_t timeout)
 {
-	bool ret = false;
-//	strcat((char *)buf, (char *)terminator);
-	if (dma1_to_periph_start((uint32_t)buf, (uint32_t)&lcd_uart->DR, len))
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
+	uint32_t current_tick = get_tick();
+
+#endif
+	for (uint16_t i = 0; i < len; i++)
 	{
-		ret = true;
+		lcd.txbuf[i] = string[i];
 	}
-	return ret;
+	for (uint8_t i = 0; i < TERM_SYMB_AMOUNT; i++)
+	{
+		lcd.txbuf[i + len] = lcd.msg_terminator[i];
+	}
+	while (!lcd_write_cmplt_flag)
+	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
+		if ((get_tick() - current_tick) > timeout)
+		{
+			return false;
+		}
+#endif
+	}
+	lcd_write_cmplt_flag = false;
+	dma1_to_periph_start((uint32_t)lcd.txbuf, (uint32_t)&lcd.uart->DR, len + TERM_SYMB_AMOUNT);
+	lcd.last_msg_len = len + TERM_SYMB_AMOUNT;
+
+	return true;
+}
+
+static void lcd_buf_flush(void)
+{
+	memset(lcd.txbuf, 0, lcd.last_msg_len);
 }
 
 void DMA1_Stream6_IRQHandler(void)
@@ -26,6 +73,7 @@ void DMA1_Stream6_IRQHandler(void)
 	// DMA transfer complete.
 	if (READ_BIT(DMA1->HISR, DMA_HISR_TCIF6))
 	{
+		lcd_write_cmplt_flag = true;
 		WRITE_REG(DMA1->HIFCR , DMA_HIFCR_CTCIF6);
 	}
 	// DMA transfer error.
@@ -33,4 +81,5 @@ void DMA1_Stream6_IRQHandler(void)
 	{
 		WRITE_REG(DMA1->HIFCR , DMA_HIFCR_CTEIF6);
 	}
+
 }

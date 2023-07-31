@@ -28,7 +28,7 @@ void dma1_init(void)
 	SET_BIT(DMA1_Stream6->CR, DMA_SxCR_TCIE);
 	SET_BIT(DMA1_Stream6->CR, DMA_SxCR_TEIE);
 
-	NVIC_SetPriority(DMA1_Stream6_IRQn, 1);
+	NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
 	NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 }
 

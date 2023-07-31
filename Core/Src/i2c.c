@@ -1,12 +1,15 @@
 #include "i2c.h"
-#include "delay.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
 
 static void sw_reset(void);
-static bool send_data_byte(I2C_TypeDef *i2c, uint8_t *buf);
 static void send_dev_addr(I2C_TypeDef *i2c, uint8_t dev_addr, Action_et action);
+static bool send_data_byte(I2C_TypeDef *i2c, uint8_t *buf);
 static bool read_data_bytes(I2C_TypeDef *i2c, uint8_t *buf, uint16_t rx_size, uint32_t current_tick, uint32_t timeout);
 static bool mem_write_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_mem_size_et e_reg_size, uint8_t *buf, uint16_t tx_size, uint32_t current_tick, uint32_t timeout);
 static bool mem_read_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_mem_size_et e_reg_size, uint8_t *buf, uint16_t rx_size, uint32_t current_tick, uint32_t timeout);
+
 
 void i2c_init(I2C_TypeDef *i2c)
 {
@@ -43,38 +46,65 @@ void i2c_init(I2C_TypeDef *i2c)
 	SET_BIT(i2c->CR1, I2C_CR1_PE);
 }
 
+
 bool i2c_write(I2C_TypeDef *i2c, uint8_t dev_addr, uint8_t *buf, uint16_t tx_size, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
-
+#endif
 	while (READ_BIT(i2c->SR2, I2C_SR2_BUSY))
 	{
-		if ((get_tick() - current_tick) > timeout)
-		{
-			return false;
-		}
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					return false;
+				}
+#elif
+				if ((get_tick() - current_tick) > timeout)
+				{
+					return false;
+				}
+#endif
 	}
 
 	CLEAR_BIT(i2c->CR1, I2C_CR1_POS);
 	SET_BIT(i2c->CR1, I2C_CR1_START);
 	while (!READ_BIT(i2c->SR1, I2C_SR1_SB))
 	{
-		if ((get_tick() - current_tick) > timeout)
-		{
-			return false;
-		}
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					return false;
+				}
+#elif
+				if ((get_tick() - current_tick) > timeout)
+				{
+					return false;
+				}
+#endif
 	}
 
 	send_dev_addr(i2c, dev_addr, WRITE);
 	/* Wait till slave ACK */
 	while (!READ_BIT(i2c->SR1, I2C_SR1_AF) && !READ_BIT(i2c->SR1, I2C_SR1_ADDR))
 	{
-		if ((get_tick() - current_tick) > timeout)
-		{
-			SET_BIT(i2c->CR1, I2C_CR1_STOP);
-			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
-			return false;
-		}
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					SET_BIT(i2c->CR1, I2C_CR1_STOP);
+					CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+					return false;
+				}
+#elif
+				if ((get_tick() - current_tick) > timeout)
+				{
+					SET_BIT(i2c->CR1, I2C_CR1_STOP);
+					CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+					return false;
+				}
+#endif
 	}
 	/* Dummy reads to reset ADDR bit */
 	i2c->SR1;
@@ -94,36 +124,63 @@ bool i2c_write(I2C_TypeDef *i2c, uint8_t dev_addr, uint8_t *buf, uint16_t tx_siz
 
 bool i2c_read(I2C_TypeDef *i2c, uint8_t dev_addr, uint8_t *buf, uint16_t rx_size, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
+#endif
 
 	while (READ_BIT(i2c->SR2, I2C_SR2_BUSY))
 	{
-		if ((get_tick() - current_tick) > timeout)
-		{
-			return false;
-		}
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					return false;
+				}
+#elif
+				if ((get_tick() - current_tick) > timeout)
+				{
+					return false;
+				}
+#endif
 	}
 
 	CLEAR_BIT(i2c->CR1, I2C_CR1_POS);
 	SET_BIT(i2c->CR1, I2C_CR1_START);
 	while (!READ_BIT(i2c->SR1, I2C_SR1_SB))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
 
 	send_dev_addr(i2c, dev_addr, READ);
 	/* Wait till slave ACK */
 	while (!READ_BIT(i2c->SR1, I2C_SR1_AF) && !READ_BIT(i2c->SR1, I2C_SR1_ADDR))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			SET_BIT(i2c->CR1, I2C_CR1_STOP);
+			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			SET_BIT(i2c->CR1, I2C_CR1_STOP);
 			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
 			return false;
 		}
+	#endif
 	}
 	/* Dummy reads to reset ADDR bit */
 	i2c->SR1;
@@ -143,24 +200,40 @@ bool i2c_read(I2C_TypeDef *i2c, uint8_t dev_addr, uint8_t *buf, uint16_t rx_size
 
 bool i2c_mem_write(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_mem_size_et e_reg_size, uint8_t *buf, uint16_t tx_size, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
-
+#endif
 	while (READ_BIT(i2c->SR2, I2C_SR2_BUSY))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
-
 	CLEAR_BIT(i2c->CR1, I2C_CR1_POS);
 	SET_BIT(i2c->CR1, I2C_CR1_START);
 	while (!READ_BIT(i2c->SR1, I2C_SR1_SB))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
 
 	if (!mem_write_data(i2c, dev_addr, reg_addr, e_reg_size, buf, tx_size, current_tick, timeout))
@@ -175,24 +248,41 @@ bool i2c_mem_write(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_me
 
 bool i2c_mem_read(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_mem_size_et e_reg_size, uint8_t *buf, uint16_t rx_size, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
-
+#endif
 	while (READ_BIT(i2c->SR2, I2C_SR2_BUSY))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
 
 	CLEAR_BIT(i2c->CR1, I2C_CR1_POS);
 	SET_BIT(i2c->CR1, I2C_CR1_START);
 	while (!READ_BIT(i2c->SR1, I2C_SR1_SB))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
 
 	if (!mem_read_data(i2c, dev_addr, reg_addr, e_reg_size, buf, rx_size, current_tick, timeout))
@@ -211,12 +301,21 @@ static bool mem_write_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr
 	/* Wait till slave ACK */
 	while (!READ_BIT(i2c->SR1, I2C_SR1_AF) && !READ_BIT(i2c->SR1, I2C_SR1_ADDR))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			SET_BIT(i2c->CR1, I2C_CR1_STOP);
+			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			SET_BIT(i2c->CR1, I2C_CR1_STOP);
 			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
 			return false;
 		}
+#endif
 	}
 	/* Dummy reads to reset ADDR bit */
 	i2c->SR1;
@@ -253,21 +352,6 @@ static bool mem_write_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr
 	return true;
 }
 
-static bool send_data_byte(I2C_TypeDef *i2c, uint8_t *buf)
-{
-	i2c->DR = *buf;
-	while (!READ_BIT(i2c->SR1, I2C_SR1_TXE))
-	{
-		if (READ_BIT(i2c->SR1, I2C_SR1_AF))
-		{
-			SET_BIT(i2c->CR1, I2C_CR1_STOP);
-			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
-			return false;
-		}
-	}
-	return true;
-}
-
 static bool read_data_bytes(I2C_TypeDef *i2c, uint8_t *buf, uint16_t rx_size, uint32_t current_tick, uint32_t timeout)
 {
 	for (uint16_t i = 0; i < rx_size; i++)
@@ -277,11 +361,19 @@ static bool read_data_bytes(I2C_TypeDef *i2c, uint8_t *buf, uint16_t rx_size, ui
 			SET_BIT(i2c->CR1, I2C_CR1_ACK);
 			while (!READ_BIT(i2c->SR1, I2C_SR1_RXNE))
 			{
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					SET_BIT(i2c->CR1, I2C_CR1_STOP);
+					return false;
+				}
+#elif
 				if ((get_tick() - current_tick) > timeout)
 				{
 					SET_BIT(i2c->CR1, I2C_CR1_STOP);
 					return false;
 				}
+#endif
 			}
 			buf[i] = i2c->DR;
 		}
@@ -291,11 +383,19 @@ static bool read_data_bytes(I2C_TypeDef *i2c, uint8_t *buf, uint16_t rx_size, ui
 			CLEAR_BIT(i2c->CR1, I2C_CR1_ACK);
 			while (!READ_BIT(i2c->SR1, I2C_SR1_RXNE))
 			{
+#ifdef RTOS
+				if ((xTaskGetTickCount() - current_tick) > timeout)
+				{
+					SET_BIT(i2c->CR1, I2C_CR1_STOP);
+					return false;
+				}
+#elif
 				if ((get_tick() - current_tick) > timeout)
 				{
 					SET_BIT(i2c->CR1, I2C_CR1_STOP);
 					return false;
 				}
+#endif
 			}
 			buf[i] = i2c->DR;
 		}
@@ -304,30 +404,27 @@ static bool read_data_bytes(I2C_TypeDef *i2c, uint8_t *buf, uint16_t rx_size, ui
 	return true;
 }
 
-static void send_dev_addr(I2C_TypeDef *i2c, uint8_t dev_addr, Action_et action)
-{
-	if (action == WRITE)
-	{
-		i2c->DR = dev_addr << 1;
-	}
-	else if (action == READ)
-	{
-		i2c->DR = (dev_addr << 1) | 1;
-	}
-}
-
 static bool mem_read_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr, Reg_mem_size_et e_reg_size, uint8_t *buf, uint16_t rx_size, uint32_t current_tick, uint32_t timeout)
 {
 	send_dev_addr(i2c, dev_addr, WRITE);
 	/* Wait till slave ACK */
 	while (!READ_BIT(i2c->SR1, I2C_SR1_AF) && !READ_BIT(i2c->SR1, I2C_SR1_ADDR))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			SET_BIT(i2c->CR1, I2C_CR1_STOP);
+			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			SET_BIT(i2c->CR1, I2C_CR1_STOP);
 			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
 			return false;
 		}
+#endif
 	}
 	/* Dummy reads to reset ADDR bit */
 	i2c->SR1;
@@ -357,22 +454,38 @@ static bool mem_read_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr,
 	SET_BIT(i2c->CR1, I2C_CR1_START);
 	while (!READ_BIT(i2c->SR1, I2C_SR1_SB))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			return false;
 		}
+#endif
 	}
 
 	send_dev_addr(i2c, dev_addr, READ);
 	/* Wait till slave ACK */
 	while (!READ_BIT(i2c->SR1, I2C_SR1_AF) && !READ_BIT(i2c->SR1, I2C_SR1_ADDR))
 	{
+#ifdef RTOS
+		if ((xTaskGetTickCount() - current_tick) > timeout)
+		{
+			SET_BIT(i2c->CR1, I2C_CR1_STOP);
+			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+			return false;
+		}
+#elif
 		if ((get_tick() - current_tick) > timeout)
 		{
 			SET_BIT(i2c->CR1, I2C_CR1_STOP);
 			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
 			return false;
 		}
+#endif
 	}
 	/* Dummy reads to reset ADDR bit */
 	i2c->SR1;
@@ -385,6 +498,35 @@ static bool mem_read_data(I2C_TypeDef *i2c, uint8_t dev_addr, uint16_t reg_addr,
 	}
 
 	return true;
+}
+
+
+
+static bool send_data_byte(I2C_TypeDef *i2c, uint8_t *buf)
+{
+	i2c->DR = *buf;
+	while (!READ_BIT(i2c->SR1, I2C_SR1_TXE))
+	{
+		if (READ_BIT(i2c->SR1, I2C_SR1_AF))
+		{
+			SET_BIT(i2c->CR1, I2C_CR1_STOP);
+			CLEAR_BIT(i2c->SR1, I2C_SR1_AF);
+			return false;
+		}
+	}
+	return true;
+}
+
+static void send_dev_addr(I2C_TypeDef *i2c, uint8_t dev_addr, Action_et action)
+{
+	if (action == WRITE)
+	{
+		i2c->DR = dev_addr << 1;
+	}
+	else if (action == READ)
+	{
+		i2c->DR = (dev_addr << 1) | 1;
+	}
 }
 
 static void sw_reset(void)

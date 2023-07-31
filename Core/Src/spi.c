@@ -1,10 +1,17 @@
 #include "spi.h"
-#include "delay.h"
+
+#ifdef RTOS
+
+	#include "FreeRTOS.h"
+	#include "task.h"
+#elif
+	#include "delay.h"
+
+#endif
 
 void spi_init(SPI_TypeDef *spi)
 {
 	SET_BIT(RCC->APB1ENR, RCC_APB1ENR_SPI2EN);
-
 
 	while (READ_BIT(spi->SR, SPI_SR_BSY));
 	CLEAR_BIT(spi->CR1, SPI_CR1_SPE);
@@ -50,31 +57,45 @@ void spi_init(SPI_TypeDef *spi)
 
 	SET_BIT(spi->CR1, SPI_CR1_SPE);
 
-//	NVIC_SetPriority(SPI2_IRQn, 2);
-//	NVIC_EnableIRQ(SPI2_IRQn);
-
 }
 
 bool spi_transmit(SPI_TypeDef *spi, uint8_t *txbuf, uint16_t txlen, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
-
+#endif
 	for (uint8_t i = 0; i < txlen; i++)
 	{
 		while (!(READ_BIT(spi->SR, SPI_SR_TXE)))
 		{
+#ifdef RTOS
+			if (xTaskGetTickCount() - current_tick > timeout)
+			{
+				return false;
+			}
+#elif
 			if (get_tick() - current_tick > timeout)
 			{
 				return false;
 			}
+#endif
 		}
 		spi->DR = txbuf[i];
 		while (!(READ_BIT(spi->SR, SPI_SR_RXNE)))
 		{
+#ifdef RTOS
+			if (xTaskGetTickCount() - current_tick > timeout)
+			{
+				return false;
+			}
+#elif
 			if (get_tick() - current_tick > timeout)
 			{
 				return false;
 			}
+#endif
 		}
 		/* Reset RXNE flag */
 		uint8_t temp = spi->DR;
@@ -86,17 +107,27 @@ bool spi_transmit(SPI_TypeDef *spi, uint8_t *txbuf, uint16_t txlen, uint32_t tim
 
 bool spi_receive(SPI_TypeDef *spi, uint8_t *rxbuf, uint16_t rxlen, uint32_t timeout)
 {
+#ifdef RTOS
+	uint32_t current_tick = xTaskGetTickCount();
+#elif
 	uint32_t current_tick = get_tick();
-
+#endif
 	for (uint8_t i = 0; i < rxlen; i++)
 	{
 		spi->DR = 0;
 		while (!(READ_BIT(spi->SR, SPI_SR_RXNE)))
 		{
+#ifdef RTOS
+			if (xTaskGetTickCount() - current_tick > timeout)
+			{
+				return false;
+			}
+#elif
 			if (get_tick() - current_tick > timeout)
 			{
 				return false;
 			}
+#endif
 		}
 		rxbuf[i] = spi->DR;
 	}

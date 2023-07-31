@@ -1,6 +1,13 @@
 #include "bme280.h"
-#include "delay.h"
 
+#ifdef RTOS
+
+	#include "FreeRTOS.h"
+	#include "task.h"
+#elif
+	#include "delay.h"
+
+#endif
 
 static bool trim_read(bme280_t *dev)
 {
@@ -74,41 +81,64 @@ status_bme280_t bme280_init(bme280_t *dev, uint8_t osrs_t, uint8_t osrs_p, uint8
 	data_write = 0xB6;  // reset sequence
 	if (!i2c_mem_write(dev->i2c_port, dev->i2c_addr, RESET_REG, REG_8BIT, &data_write, 1, 100))
 		return dev->status_dev = WRITE_READ_ERR;
-
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	// write the humidity oversampling to 0xF2
 	data_write = osrs_h;
 	if (!i2c_mem_write(dev->i2c_port, dev->i2c_addr, CTRL_HUM_REG, REG_8BIT, &data_write, 1, 100))
 		return dev->status_dev = WRITE_READ_ERR;
 
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	i2c_mem_read(dev->i2c_port, dev->i2c_addr, CTRL_HUM_REG, REG_8BIT, &data_check, 1, 100);
 	if (data_check != data_write)
 		return dev->status_dev = WRITE_READ_ERR;
 
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	// write the standby time and IIR filter coeff to 0xF5
 	data_write = (t_sb <<5) |(filter << 2);
 	if (!i2c_mem_write(dev->i2c_port, dev->i2c_addr, CONFIG_REG, REG_8BIT, &data_write, 1, 100))
 		return dev->status_dev = WRITE_READ_ERR;
 
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	i2c_mem_read(dev->i2c_port, dev->i2c_addr, CONFIG_REG, REG_8BIT, &data_check, 1, 100);
 	if (data_check != data_write)
 		return dev->status_dev = WRITE_READ_ERR;
 
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	// write the pressure and temp oversampling along with mode to 0xF4
 	data_write = (osrs_t << 5) |(osrs_p << 2) | mode;
 	if (!i2c_mem_write(dev->i2c_port, dev->i2c_addr, CTRL_MEAS_REG, REG_8BIT, &data_write, 1, 100))
 		return dev->status_dev = WRITE_READ_ERR;
 
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(10));
+#elif
 	delay_ms(10);
+#endif
 
 	i2c_mem_read(dev->i2c_port, dev->i2c_addr, CTRL_MEAS_REG, REG_8BIT, &data_check, 1, 100);
 	if (data_check != data_write)

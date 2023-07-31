@@ -2,7 +2,15 @@
 
 #include "wizchip.h"
 #include "spi.h"
-#include "delay.h"
+
+#ifdef RTOS
+
+	#include "FreeRTOS.h"
+	#include "task.h"
+#elif
+	#include "delay.h"
+
+#endif
 
 static bool are_equal(uint8_t *arr1, uint8_t *arr2, uint8_t arrs_size);
 
@@ -37,10 +45,18 @@ static void w5500_write_byte(uint8_t wb)
 static void w5500_hw_reset()
 {
 	CLEAR_BIT(W5500_RST_GPIO_PORT->ODR, GPIO_ODR_OD10);
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(100));
+#elif
 	delay_ms(100);
+#endif
 //	vTaskDelay(pdMS_TO_TICKS(100));
 	SET_BIT(W5500_RST_GPIO_PORT->ODR, GPIO_ODR_OD10);
+#ifdef RTOS
+	vTaskDelay(pdMS_TO_TICKS(100));
+#elif
 	delay_ms(100);
+#endif
 //	vTaskDelay(pdMS_TO_TICKS(100));
 }
 
