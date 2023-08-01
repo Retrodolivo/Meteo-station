@@ -87,6 +87,6 @@ typedef struct
 
 
 status_bme280_t bme280_init(bme280_t *dev, uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t mode, uint8_t t_sb, uint8_t filter);
-void bme280_measure(bme280_t *dev);
+bool bme280_measure(bme280_t *dev);
 
 #endif /* INC_BME280_H_ */

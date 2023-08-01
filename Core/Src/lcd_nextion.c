@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "lcd_nextion.h"
 #include "dma.h"
 
@@ -34,14 +35,6 @@ bool lcd_write(uint8_t *string, uint16_t len, uint32_t timeout)
 	uint32_t current_tick = get_tick();
 
 #endif
-	for (uint16_t i = 0; i < len; i++)
-	{
-		lcd.txbuf[i] = string[i];
-	}
-	for (uint8_t i = 0; i < TERM_SYMB_AMOUNT; i++)
-	{
-		lcd.txbuf[i + len] = lcd.msg_terminator[i];
-	}
 	while (!lcd_write_cmplt_flag)
 	{
 #ifdef RTOS
@@ -56,11 +49,53 @@ bool lcd_write(uint8_t *string, uint16_t len, uint32_t timeout)
 		}
 #endif
 	}
+	for (uint16_t i = 0; i < len; i++)
+	{
+		lcd.txbuf[i] = string[i];
+	}
+	for (uint8_t i = 0; i < TERM_SYMB_AMOUNT; i++)
+	{
+		lcd.txbuf[len + i] = lcd.msg_terminator[i];
+	}
 	lcd_write_cmplt_flag = false;
 	dma1_to_periph_start((uint32_t)lcd.txbuf, (uint32_t)&lcd.uart->DR, len + TERM_SYMB_AMOUNT);
 	lcd.last_msg_len = len + TERM_SYMB_AMOUNT;
 
 	return true;
+}
+
+
+bool lcd_set_page(char *page, uint32_t timeout)
+{
+	bool ret = false;
+
+	char temp[100];
+	uint16_t len = sprintf(temp, "page %s", page);
+	ret = lcd_write((uint8_t *)temp, len, timeout);
+
+	return ret;
+}
+
+bool lcd_set_txt_color(char *label, char *color, uint32_t timeout)
+{
+	bool ret = false;
+
+	char temp[100];
+	uint16_t len = sprintf(temp, "%s.pco=%s", label, color);
+	ret = lcd_write((uint8_t *)temp, len, timeout);
+
+	return ret;
+}
+
+bool lcd_set_txt(char *label, char *txt, uint32_t timeout)
+{
+	bool ret = false;
+
+	char temp[100];
+	uint16_t len = sprintf(temp, "%s.txt=\"%s\"", label, txt);
+	ret = lcd_write((uint8_t *)temp, len, timeout);
+
+	return ret;
 }
 
 static void lcd_buf_flush(void)

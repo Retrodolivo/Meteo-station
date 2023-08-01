@@ -4,6 +4,14 @@
 #include "main.h"
 
 
+typedef struct
+{
+	float tempr;
+	float press;
+	float humid;
+} Sensor_data_st;
+
+
 void main_task(void *params);
 
 

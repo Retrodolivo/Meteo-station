@@ -245,14 +245,19 @@ static void bme280_wakeup(bme280_t *dev)
 	i2c_mem_write(dev->i2c_port, dev->i2c_addr, CTRL_MEAS_REG, REG_8BIT, &data_write, 1, 100);
 }
 
-void bme280_measure(bme280_t *dev)
+bool bme280_measure(bme280_t *dev)
 {
+	bool ret = false;
+
 	bme280_wakeup(dev);
 	if (bme280_read_raw(dev) == OK)
 	{
 		dev->temperature = (bme280_compensate_T_int32(dev)) / 100.0;  // as per datasheet, the temp is x100
 		dev->pressure = bme280_compensate_P_int32(dev);  // as per datasheet, the pressure is Pa
 		dev->humidity = (bme280_compensate_H_int32(dev)) / 1024.0;  // as per datasheet, the temp is x1024
+		ret = true;
 	}
+
+	return ret;
 }
 
