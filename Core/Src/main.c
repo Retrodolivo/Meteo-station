@@ -10,8 +10,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include "timers.h"
 
 #include "rcc.h"
+#include "rtc.h"
 #include "i2c.h"
 #include "usart.h"
 #include "spi.h"
@@ -27,12 +29,17 @@ TaskHandle_t init_task_handle;
 TaskHandle_t main_task_handle;
 TaskHandle_t main_sensor_task_handle;
 TaskHandle_t net_task_handle;
+
+TimerHandle_t datetime_timer;
+
 QueueHandle_t init_state_queue;
 QueueHandle_t sensor_data_queue;
+QueueHandle_t datetime_queue;
 
 static void init_task(void *params);
 static void main_sensor_task(void *params);
 static void net_task(void *params);
+extern void datetime_timer_callback(TimerHandle_t timer_handle);
 extern void main_task(void *params);
 
 static void rtos_entities_init(void);
@@ -44,6 +51,7 @@ bme280_t main_sensor;
 Init_state_st init_state;
 extern Sensor_data_st main_sensor_meas;
 uint8_t lcd_buf[256];
+DateTime_st datetime;
 
 int main(void)
 {
@@ -68,8 +76,8 @@ void led_init(void)
 
 	MODIFY_REG(GPIOD->MODER, GPIO_MODER_MODER13, 1<<GPIO_MODER_MODER13_Pos);
 	CLEAR_BIT(GPIOD->OTYPER, GPIO_OTYPER_OT_13);
-	MODIFY_REG(GPIOD->OSPEEDR, GPIO_OSPEEDR_OSPEED13, 0 << GPIO_OSPEEDR_OSPEED13_Pos);
-	MODIFY_REG(GPIOD->PUPDR, GPIO_PUPDR_PUPD13, 0 << GPIO_PUPDR_PUPD13_Pos);
+	MODIFY_REG(GPIOD->OSPEEDR, GPIO_OSPEEDR_OSPEED13, 0<<GPIO_OSPEEDR_OSPEED13_Pos);
+	MODIFY_REG(GPIOD->PUPDR, GPIO_PUPDR_PUPD13, 0<<GPIO_PUPDR_PUPD13_Pos);
 
 	CLEAR_BIT(GPIOD->ODR, GPIO_ODR_OD13);
 }
@@ -81,6 +89,21 @@ static void system_init(void)
 	spi_init(SPI2);
 	usart_init(USART2, 9600);
 	dma1_init();
+
+	if (!READ_BIT(RTC->ISR, RTC_ISR_INITS))
+	{
+		rtc_init();
+
+		datetime.year = 23;
+		datetime.month = 8;
+		datetime.date = 20;
+		datetime.hours = 12;
+		datetime.minutes = 0;
+		datetime.seconds = 0;
+
+		rtc_set_datetime(&datetime);
+	}
+
 }
 
 static void rtos_entities_init(void)
@@ -127,8 +150,14 @@ static void init_task(void *params)
 
 		init_state_queue = xQueueCreate(1, sizeof(Init_state_st));
 		configASSERT(init_state_queue != NULL);
-
 		xQueueOverwrite(init_state_queue, &init_state);
+
+		datetime_timer = xTimerCreate("datetime_timer", pdMS_TO_TICKS(900), pdTRUE, NULL, datetime_timer_callback);
+		configASSERT(datetime_timer != NULL);
+		xTimerStart(datetime_timer, 0);
+
+		datetime_queue = xQueueCreate(1, sizeof(DateTime_st));
+		configASSERT(datetime_queue != NULL);
 
 		vTaskSuspend(NULL);
 	}
@@ -156,7 +185,7 @@ static void main_sensor_task(void *params)
 			/* Report about sensor no response */
 		}
 
-		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(2000));
 	}
 }
 

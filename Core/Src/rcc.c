@@ -3,11 +3,9 @@
 void rcc_config(void)
 {
 	/*Sysclock = 168MHz*/
-
-
-	while (READ_BIT(RCC->CR, RCC_CR_HSIRDY) == RESET);
+	while (!READ_BIT(RCC->CR, RCC_CR_HSIRDY));
 	SET_BIT(RCC->CR, RCC_CR_HSEON);
-	while (READ_BIT(RCC->CR, RCC_CR_HSERDY) == RESET);
+	while (!READ_BIT(RCC->CR, RCC_CR_HSERDY));
 	SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);
 	/*5ms flash latency for 168Mhz sysclock*/
 	MODIFY_REG(FLASH->ACR, FLASH_ACR_LATENCY, FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);

@@ -24,7 +24,7 @@
 #define HUMID_VAL_LBL			"t_H"
 
 #define TIME_VAL_LBL			"t_time"
-#define DATA_VAL_LBL			"t_date"
+#define DATE_VAL_LBL			"t_date"
 
 #define IP_VAL_LBL				"t_ip"
 /* Misc */
