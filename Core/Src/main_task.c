@@ -19,7 +19,6 @@ extern QueueHandle_t sensor_data_queue;
 extern QueueHandle_t datetime_queue;
 Sensor_data_st main_sensor_meas;
 
-
 extern DateTime_st datetime;
 
 static void init_routine(Init_state_st *init_state);

@@ -22,6 +22,7 @@
 #include "wizchip.h"
 #include "lcd_nextion.h"
 #include "main_task.h"
+#include "net_task.h"
 
 #define DWT_CTRL	(*(volatile uint32_t *)0xE0001000)
 
@@ -38,7 +39,7 @@ QueueHandle_t datetime_queue;
 
 static void init_task(void *params);
 static void main_sensor_task(void *params);
-static void net_task(void *params);
+extern void net_task(void *params);
 extern void datetime_timer_callback(TimerHandle_t timer_handle);
 extern void main_task(void *params);
 
@@ -137,7 +138,7 @@ static void init_task(void *params)
 			vTaskSuspend(main_sensor_task_handle);
 			sensor_data_queue = xQueueCreate(5, sizeof(Sensor_data_st));
 		}
-		if (w5500_init(SPI2))
+		if (net_init())
 		{
 			init_state.net_ok = true;
 			status = xTaskCreate(net_task, "net_task", configMINIMAL_STACK_SIZE * 2, NULL, 2, &net_task_handle);
@@ -186,16 +187,6 @@ static void main_sensor_task(void *params)
 		}
 
 		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(2000));
-	}
-}
-
-static void net_task(void *params)
-{
-	TickType_t xLastWakeTime = xTaskGetTickCount();
-
-	while (1)
-	{
-		xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
 	}
 }
 
