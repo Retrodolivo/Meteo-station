@@ -3,6 +3,7 @@
 
 #include "main.h"
 
+#define MAX_POINTS	3
 
 typedef struct
 {
@@ -10,6 +11,12 @@ typedef struct
 	float press;
 	float humid;
 } Sensor_data_st;
+
+typedef struct
+{
+	Sensor_data_st sensor_data;
+	uint32_t timestamp;
+} Point_st;
 
 
 void main_task(void *params);

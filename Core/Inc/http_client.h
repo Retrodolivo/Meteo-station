@@ -73,8 +73,7 @@ extern uint8_t  httpc_isConnected;
 extern uint16_t httpc_isReceived;
 
 // extern: HTTP request structure
-extern HttpRequest request_power_data;
-extern HttpRequest request_system_status;
+extern HttpRequest request;
 
 /*********************************************
 * HTTP Client Functions

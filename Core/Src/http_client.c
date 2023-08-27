@@ -13,8 +13,7 @@
 uint8_t * httpc_send_buf;
 uint8_t * httpc_recv_buf;
 //HttpRequest request = HttpRequest_multipart_post_initializer;
-HttpRequest request_power_data = HttpRequest_get_initializer;
-HttpRequest request_system_status = HttpRequest_get_initializer;
+HttpRequest request = HttpRequest_get_initializer;
 
 static int8_t httpsock = 0;
 static uint8_t dest_ip[4] = {0, };

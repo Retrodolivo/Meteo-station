@@ -36,6 +36,7 @@ TimerHandle_t datetime_timer;
 QueueHandle_t init_state_queue;
 QueueHandle_t sensor_data_queue;
 QueueHandle_t datetime_queue;
+QueueHandle_t meas_points_queue;
 
 static void init_task(void *params);
 static void main_sensor_task(void *params);
@@ -51,6 +52,7 @@ void led_init(void);
 bme280_t main_sensor;
 Init_state_st init_state;
 extern Sensor_data_st main_sensor_meas;
+extern Point_st meas_points[MAX_POINTS];
 uint8_t lcd_buf[256];
 DateTime_st datetime;
 
@@ -141,7 +143,7 @@ static void init_task(void *params)
 		if (net_init())
 		{
 			init_state.net_ok = true;
-			status = xTaskCreate(net_task, "net_task", configMINIMAL_STACK_SIZE * 2, NULL, 2, &net_task_handle);
+			status = xTaskCreate(net_task, "net_task", configMINIMAL_STACK_SIZE * 10, NULL, 2, &net_task_handle);
 			configASSERT(status == pdPASS);
 			vTaskSuspend(net_task_handle);
 		}
@@ -159,6 +161,9 @@ static void init_task(void *params)
 
 		datetime_queue = xQueueCreate(1, sizeof(DateTime_st));
 		configASSERT(datetime_queue != NULL);
+
+		meas_points_queue = xQueueCreate(1, sizeof(Point_st) * MAX_POINTS);
+		configASSERT(meas_points_queue != NULL);
 
 		vTaskSuspend(NULL);
 	}
@@ -178,7 +183,7 @@ static void main_sensor_task(void *params)
 			main_sensor_meas.humid = main_sensor.humidity;
 			if (xQueueSend(sensor_data_queue, &main_sensor_meas, 100) != pdTRUE)
 			{
-				/*Error. Queue is full */
+				/*Queue is full */
 			}
 		}
 		else

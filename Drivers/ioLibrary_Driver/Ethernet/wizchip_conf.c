@@ -51,8 +51,8 @@
 //A20140501 : for use the type - ptrdiff_t
 #include <stddef.h>
 //
-//#include "FreeRTOS.h"
-//#include "task.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include "wizchip_conf.h"
 
 /////////////
@@ -65,7 +65,7 @@
  * null function is called.
  */
 //void 	  wizchip_cris_enter(void)           {};
-void 	  wizchip_cris_enter(void)           {}//taskENTER_CRITICAL();}
+void 	  wizchip_cris_enter(void)           {taskENTER_CRITICAL();}
 
 /**
  * @brief Default function to disable interrupt.
@@ -73,7 +73,7 @@ void 	  wizchip_cris_enter(void)           {}//taskENTER_CRITICAL();}
  * null function is called.
  */
 //void 	  wizchip_cris_exit(void)          {};
-void 	  wizchip_cris_exit(void)          {}//taskEXIT_CRITICAL();}
+void 	  wizchip_cris_exit(void)          {taskEXIT_CRITICAL();}
 
 /**
  * @brief Default function to select chip.

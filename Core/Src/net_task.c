@@ -3,6 +3,8 @@
 
 #include "net_task.h"
 #include "http_client.h"
+#include "main_task.h"
+#include "json.h"
 #include "wizchip_conf.h"
 #include "socket.h"
 #include "wizchip.h"
@@ -14,14 +16,24 @@
 #define TX_HTTP_BUF_SIZE		2048
 #define RX_HTTP_BUF_SIZE		2048
 
-uint8_t tx_buf[TX_HTTP_BUF_SIZE];
-uint8_t rx_buf[RX_HTTP_BUF_SIZE];
+static uint8_t tx_buf[TX_HTTP_BUF_SIZE];
+static uint8_t rx_buf[RX_HTTP_BUF_SIZE];
+
+extern QueueHandle_t meas_points_queue;
+
 
 Server_params_st main_server;
 
-uint8_t http_answer_ok[] = "HTTP/1.1 200 OK";
-bool was_accepted = false;
+static uint8_t http_answer_ok[] = "HTTP/1.1 200 OK";
+static bool was_accepted = false;
 
+static uint8_t main_sensor_endpoint[] = "/main-sensor";
+static uint8_t keep_alive_connection[] = "keep-alive";
+static uint8_t json_content_type[] = "application/json";
+
+static uint8_t json_buf[512];
+
+static void send_json(HttpRequest *request, uint8_t *json_buf);
 static void ip2name(uint8_t *ip_buf, uint8_t *name_buf);
 static void flush_tx_buf(void);
 static void flush_rx_buf(void);
@@ -34,21 +46,21 @@ bool net_init(void)
 
 	wizchip_ok = w5500_init(SPI2);
 
-	main_server.ip[0] = 192;
-	main_server.ip[1] = 168;
-	main_server.ip[2] = 42;
-	main_server.ip[3] = 89;
+	main_server.ip[0] = 169;
+	main_server.ip[1] = 254;
+	main_server.ip[2] = 223;
+	main_server.ip[3] = 76;
 	main_server.port = 80;
 	main_server.wizchip_socket = 0;
 	ip2name(main_server.ip, main_server.name);
 
-//	/*connection is stable after reset only in 'keep-alive'*/
-//	/*POST power point*/
-//	request_power_data.method = (uint8_t *)HTTP_POST;
-//	request_power_data.uri = power_data_endpoint;
-//	request_power_data.host = main_server.name;
-//	request_power_data.connection = keep_alive_connection;
-//	request_power_data.content_type = json_content_type;
+	/*connection is stable after reset only in 'keep-alive'*/
+	/*POST points*/
+	request.method = (uint8_t *)HTTP_POST;
+	request.uri = main_sensor_endpoint;
+	request.host = main_server.name;
+	request.connection = keep_alive_connection;
+	request.content_type = json_content_type;
 
 	if (httpc_init(main_server.wizchip_socket, main_server.ip, main_server.port, tx_buf, rx_buf))
 	{
@@ -89,19 +101,14 @@ void net_task(void *params)
 		}
 		if(httpc_isConnected)
 		{
-//			if (xQueueReceive(tx_json_power_queue, &tx_json_power_buf, 0))
-//			{
-//				httpc_connect();
-//				send_json(&request_power_data, tx_json_power_buf);
-//			}
-//
-//			if (xQueueReceive(tx_json_status_queue, &tx_json_status_buf, 0))
-//			{
-//				httpc_connect();
-//				send_json(&request_system_status, tx_json_status_buf);
-//				NVIC_SystemReset();
-//			}
-
+			static Point_st temp[MAX_POINTS];
+			if (xQueueReceive(meas_points_queue, &temp, 0))
+			{
+				httpc_connect();
+				json_create(json_buf, temp, MAX_POINTS);
+				send_json(&request, json_buf);
+				flush_tx_buf();
+			}
 			if(httpc_isReceived > 0)
 			{
 				uint16_t len = 0;
@@ -122,6 +129,17 @@ void net_task(void *params)
 	}
 }
 
+static void send_json(HttpRequest *request, uint8_t *json_buf)
+{
+	uint16_t content_len = strlen((char *)json_buf);
+	uint32_t headers_len = httpc_form_req_no_body(request, tx_buf, content_len);
+	for (uint16_t i = 0; i < content_len; i++)
+	{
+		tx_buf[headers_len + i] = json_buf[i];
+	}
+	http_send_buf(tx_buf, headers_len + content_len);
+	flush_tx_buf();
+}
 
 static void ip2name(uint8_t *ip_buf, uint8_t *name_buf)
 {

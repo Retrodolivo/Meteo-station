@@ -89,15 +89,15 @@ bool w5500_init(SPI_TypeDef *spi)
 	uint8_t mac[6] = {0x00, 0x08, 0xdc, 0xab, 0xcd, 0xef};
 	memcpy(w5500.netinfo.mac, mac, 6);
 
-	uint8_t ip[4] = {192, 168, 42, 200};
+	uint8_t ip[4] = {169, 254, 223, 80};
 	memcpy(w5500.netinfo.ip, ip, 4);
 
 	/*setting subnet mask*/
-	uint8_t sn[4] = {255, 255, 255, 0};
+	uint8_t sn[4] = {255, 255, 0, 0};
 	memcpy(w5500.netinfo.sn, sn, 4);
 
 	/*setting gateway*/
-	uint8_t gw[4] = {192, 168, 0, 2};
+	uint8_t gw[4] = {192, 168, 0, 1};
 	memcpy(w5500.netinfo.gw, gw, 4);
 
 	wizchip_init(w5500.rxtx_buff, w5500.rxtx_buff);

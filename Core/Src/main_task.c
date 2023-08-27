@@ -10,6 +10,7 @@
 #include "queue.h"
 #include "timers.h"
 
+
 extern TaskHandle_t main_task_handle;
 extern TaskHandle_t main_sensor_task_handle;
 extern TaskHandle_t net_task_handle;
@@ -17,7 +18,9 @@ extern TaskHandle_t net_task_handle;
 extern QueueHandle_t init_state_queue;
 extern QueueHandle_t sensor_data_queue;
 extern QueueHandle_t datetime_queue;
+extern QueueHandle_t meas_points_queue;
 Sensor_data_st main_sensor_meas;
+Point_st meas_points[MAX_POINTS];
 
 extern DateTime_st datetime;
 
@@ -38,11 +41,25 @@ void main_task(void *params)
 		if (xQueueReceive(sensor_data_queue, &main_sensor_meas, 0))
 		{
 			show_sensor_data(&main_sensor_meas, 200);
+
+			static uint8_t curr_point = 0;
+
+			meas_points[curr_point].sensor_data = main_sensor_meas;
+			rtc_get_datetime(&datetime);
+			meas_points[curr_point].timestamp = datetime.timestamp;
+			curr_point++;
+
+			if (curr_point == MAX_POINTS)
+			{
+				xQueueSend(meas_points_queue, &meas_points, pdMS_TO_TICKS(0));
+				curr_point = 0;
+			}
 		}
 		if (xQueueReceive(datetime_queue, &datetime, 0))
 		{
 			show_datetime(&datetime, 200);
 		}
+
 	}
 }
 
